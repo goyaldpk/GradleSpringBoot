@@ -1,0 +1,52 @@
+node {
+	stage('Clean workspace') {
+		step([$class: 'WsCleanup'])
+		}    
+		
+		try{
+		
+		def tagId = "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
+		def api_image_name = "dpktan/andservice-read-api:" + tagId.replaceAll(/\//, "-")
+		def app
+		
+		/* Checkout the code we are currently running against */
+		stage('Checkout') {
+			checkout scm
+		}
+		docker.image("gradle:3.5-jdk8-alpine").inside() {
+            
+            if (env.BRANCH_NAME != 'uat' && env.BRANCH_NAME != 'master') {
+				stage('Run tests') {
+					sh 'gradle clean build'
+				}
+			}
+			
+			stage ('Build') {
+                sh 'gradle clean build -xtest'
+            }
+        }
+        
+        /* Build the Docker image with a Dockerfile */
+        stage ('Build Docker image') {
+            app = docker.build("${api_image_name}", '.')
+        }
+        /* Push the image to Docker Hub, using credentials we have setup separately on the worker node */
+        if (env.BRANCH_NAME == 'develop' || env.BRANCH_NAME == 'uat' || env.BRANCH_NAME == 'master') {
+			stage('Push to Dockerhub') {
+				app.push()
+				app.push("${env.BRANCH_NAME}-latest")
+			}
+		}
+		
+		}catch(error){
+			throw error
+		}finally {
+			try {
+				stage('Tidy Up') {
+					step([$class: 'WsCleanup'])
+				}
+			} catch (error) {
+				throw error
+			}
+		}
+}
