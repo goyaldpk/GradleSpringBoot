@@ -17,12 +17,12 @@ node {
             
             if (env.BRANCH_NAME != 'uat' && env.BRANCH_NAME != 'master') {
 				stage('Run tests') {
-					sh 'gradle clean build'
+					sh 'gradle clean build -x test'
 				}
 			}
 			
 			stage ('Build') {
-                sh 'gradle clean build -xtest'
+                sh 'gradle clean build -x test'
             }
         }
         
